@@ -18,7 +18,6 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 async function orm() {
-    eval('console.log("This is a vulnerability!")')
     console.log('[ORM] ✔ Initializing Database...')
     const db = Database.getInstance()
     await db.sync()
