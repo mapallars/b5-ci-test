@@ -52,6 +52,10 @@ app.post('/eval', (req, res) => {
     res.json({ result })
 })
 
+app.get('/xss2', (req, res) => {
+    res.send(req.query.q)
+})
+
 app.listen(3000, () => {
     console.log('🚨 Vulnerable API running on port 3000')
 })
