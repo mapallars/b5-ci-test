@@ -1,0 +1,364 @@
+# ============================================================
+#  CI Pipeline — bitfive monorepo
+#  Backend : /api  (TypeScript / Node.js)
+#  Frontend: /app  (JavaScript / React)
+#
+#  Jobs
+#  ├── lint    → matrix: [backend, frontend]
+#  ├── build   → matrix: [backend, frontend]
+#  └── semgrep → SAST dividido por path
+#
+#  Política Semgrep
+#  ├── PR → develop   : baseline scan
+#  ├── push develop   : full scan
+#  ├── PR → main      : full scan estricto
+#  └── push main / release/* / hotfix/* : full scan estricto
+# ============================================================
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "release/*"
+      - "hotfix/*"
+  pull_request:
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 20
+
+jobs:
+  # ----------------------------------------------------------
+  # 1. LINT
+  # ----------------------------------------------------------
+  lint:
+    name: "Lint · ${{ matrix.name }}"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            path: api
+            lang: typescript
+          - name: frontend
+            path: app
+            lang: javascript
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.path }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type-check
+        if: matrix.lang == 'typescript'
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npm run lint --if-present
+
+  # ----------------------------------------------------------
+  # 2. BUILD
+  # ----------------------------------------------------------
+  build:
+    name: "Build · ${{ matrix.name }}"
+    runs-on: ubuntu-latest
+    needs: lint
+    if: needs.lint.result == 'success' || needs.lint.result == 'failure'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            path: api
+            artifact: backend-dist
+            dist: api/dist
+          - name: frontend
+            path: app
+            artifact: frontend-dist
+            dist: app/dist
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.path }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.dist }}
+          retention-days: 3
+
+  # ----------------------------------------------------------
+  # 3. ANÁLISIS DE DEPENDENCIAS
+  # ----------------------------------------------------------
+  dependency-audit:
+    name: "Audit · ${{ matrix.name }}"
+    runs-on: ubuntu-latest
+    needs: lint
+    if: needs.lint.result == 'success' || needs.lint.result == 'failure'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            path: api
+          - name: frontend
+            path: app
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.path }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit — reporte JSON
+        run: npm audit --json > npm-audit-report.json 2>&1 || true
+
+      - name: npm audit — resumen
+        run: npm audit --audit-level=info || true
+
+      - name: Archivar reporte de auditoría
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-${{ matrix.name }}
+          path: ${{ matrix.path }}/npm-audit-report.json
+          retention-days: 14
+
+      - name: Verificar vulnerabilidades críticas
+        run: npm audit --audit-level=high
+
+  # ----------------------------------------------------------
+  # 4. SEMGREP SAST
+  # ----------------------------------------------------------
+  semgrep:
+    name: "SAST · Semgrep"
+    runs-on: ubuntu-latest
+    needs: build
+    if: needs.build.result == 'success' || needs.build.result == 'failure'
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fix git ownership
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # Login condicional con Semgrep Cloud
+      - name: Semgrep Login (Cloud — condicional)
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          if [ -n "$SEMGREP_APP_TOKEN" ]; then
+            semgrep login
+            echo "SEMGREP_AUTHENTICATED=true" >> $GITHUB_ENV
+            echo "✅ Autenticado con Semgrep Cloud"
+          else
+            echo "SEMGREP_AUTHENTICATED=false" >> $GITHUB_ENV
+            echo "ℹ️  Sin SEMGREP_APP_TOKEN — usando reglas públicas y locales únicamente"
+          fi
+
+      # Reglas personalizadas
+      - name: Detectar reglas personalizadas
+        id: custom_rules
+        run: |
+          CUSTOM_FLAG=""
+          if [ -d ".semgrep/rules" ] && [ "$(ls -A .semgrep/rules 2>/dev/null)" ]; then
+            CUSTOM_FLAG="--config=.semgrep/rules"
+            echo "📁 Reglas personalizadas detectadas en .semgrep/rules/"
+            ls .semgrep/rules/
+          else
+            echo "ℹ️  Sin reglas personalizadas (.semgrep/rules/ vacío o no encontrado)"
+          fi
+          echo "flag=$CUSTOM_FLAG" >> $GITHUB_OUTPUT
+
+      - name: Determinar política
+        id: policy
+        run: |
+          STRICT="false"
+          BASELINE=""
+
+          if [ "${{ github.event_name }}" = "pull_request" ] \
+          && [ "${{ github.base_ref }}" = "main" ]; then
+            STRICT="true"
+          fi
+
+          if [ "${{ github.ref }}" = "refs/heads/main" ] \
+          || echo "${{ github.ref }}" | grep -qE '^refs/heads/release/|^refs/heads/hotfix/'; then
+            STRICT="true"
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ] \
+          && [ "${{ github.base_ref }}" = "develop" ]; then
+            BASELINE="--baseline-commit=origin/develop"
+          fi
+
+          echo "strict=$STRICT"     >> $GITHUB_OUTPUT
+          echo "baseline=$BASELINE" >> $GITHUB_OUTPUT
+
+      - name: Semgrep · Backend (/api)
+        id: scan_backend
+        continue-on-error: true
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          semgrep scan \
+            --verbose \
+            --config=p/ci \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/typescript \
+            --config=p/nodejs \
+            ${{ steps.custom_rules.outputs.flag }} \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=coverage \
+            --exclude='*.min.js' \
+            ${{ steps.policy.outputs.baseline }} \
+            --severity=ERROR \
+            --sarif --output=results-backend.sarif \
+            ./api || true
+
+          FINDINGS=$(python3 -c "
+          import json
+          sarif = json.load(open('results-backend.sarif'))
+          print(sum(len(r.get('results', [])) for r in sarif.get('runs', [])))
+          ")
+
+          echo "Findings backend: $FINDINGS"
+
+          if [ "$FINDINGS" -gt "0" ] && [ "${{ steps.policy.outputs.strict }}" = "true" ]; then
+            echo "❌ Semgrep Backend: $FINDINGS finding(s) con severidad ERROR."
+            echo "👉 Code scanning: https://github.com/${{ github.repository }}/security/code-scanning"
+            exit 1
+          fi
+
+      - name: Semgrep · Frontend (/app)
+        id: scan_frontend
+        continue-on-error: true
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          semgrep scan \
+            --verbose \
+            --config=p/ci \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/javascript \
+            --config=p/react \
+            ${{ steps.custom_rules.outputs.flag }} \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=build \
+            --exclude=coverage \
+            --exclude=.vite \
+            --exclude=.turbo \
+            --exclude=.next \
+            --exclude='*.min.js' \
+            ${{ steps.policy.outputs.baseline }} \
+            --severity=ERROR \
+            --sarif --output=results-frontend.sarif \
+            ./app || true
+
+          FINDINGS=$(python3 -c "
+          import json
+          sarif = json.load(open('results-frontend.sarif'))
+          print(sum(len(r.get('results', [])) for r in sarif.get('runs', [])))
+          ")
+
+          echo "Findings frontend: $FINDINGS"
+
+          if [ "$FINDINGS" -gt "0" ] && [ "${{ steps.policy.outputs.strict }}" = "true" ]; then
+            echo "❌ Semgrep Frontend: $FINDINGS finding(s) con severidad ERROR."
+            echo "👉 Code scanning: https://github.com/${{ github.repository }}/security/code-scanning"
+            exit 1
+          fi
+
+      - name: Publicar SARIF · Backend
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results-backend.sarif
+          category: semgrep-backend
+
+      - name: Publicar SARIF · Frontend
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results-frontend.sarif
+          category: semgrep-frontend
+
+      - name: Verificar resultados · Backend
+        if: always()
+        run: |
+          if [ "${{ steps.scan_backend.outcome }}" = "failure" ]; then
+            echo "❌ El scan de Backend encontró findings con severidad ERROR en modo estricto."
+            echo "👉 Code scanning: https://github.com/${{ github.repository }}/security/code-scanning"
+            exit 1
+          fi
+          echo "✅ Scan de Backend sin findings bloqueantes."
+
+      - name: Verificar resultados · Frontend
+        if: always()
+        run: |
+          if [ "${{ steps.scan_frontend.outcome }}" = "failure" ]; then
+            echo "❌ El scan de Frontend encontró findings con severidad ERROR en modo estricto."
+            echo "👉 Code scanning: https://github.com/${{ github.repository }}/security/code-scanning"
+            exit 1
+          fi
+          echo "✅ Scan de Frontend sin findings bloqueantes."

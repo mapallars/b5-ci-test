@@ -1,0 +1,273 @@
+import { InvalidFormatError } from "../errors/InvalidFormat.error.js"
+
+export class Validator {
+
+    static required(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (fields[key] === undefined || fields[key] === null || fields[key].toString().trim() === '') {
+                throw new error(`El campo ${key} es requerido y no puede estar vacío`)
+            }
+        })
+        return this
+    }
+
+    static length(fields, min, max, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (fields[key].length < min || fields[key].length > max) {
+                throw new error(`El campo ${key} debe tener entre ${min} y ${max} caracteres`)
+            }
+        })
+        return this
+    }
+
+    static email(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+            if (!emailRegex.test(fields[key])) {
+                throw new error(`El campo ${key} debe ser un email válido`)
+            }
+        })
+        return this
+    }
+
+    static url(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const urlRegex = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i
+            if (!urlRegex.test(fields[key])) {
+                throw new error(`El campo ${key} debe ser una URL válida`)
+            }
+        })
+        return this
+    }
+
+    static type(fields, type, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (typeof fields[key] !== type) {
+                throw new error(`El campo ${key} debe ser de tipo ${type}`)
+            }
+        })
+        return this
+    }
+
+    static isArray(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (!(fields[key] instanceof Array)) {
+                throw new error(`El campo ${key} debe ser un array`)
+            }
+        })
+        return this
+    }
+
+    static isNumeric(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (isNaN(fields[key])) {
+                throw new error(`El campo ${key} debe ser un número válido`)
+            }
+        })
+        return this
+    }
+
+    static isAlfaNumeric(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const alfaNumericRegex = /^[a-zA-Z][a-zA-Z0-9._]{2,50}$/
+            if (!alfaNumericRegex.test(fields[key])) {
+                throw new error(`El campo ${key} debe ser un email válido`)
+            }
+        })
+        return this
+    }
+
+    static isInteger(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (!/^-?\d+$/.test(String(fields[key]))) {
+                throw new error(`El campo ${key} debe ser un número entero`)
+            }
+        })
+        return this
+    }
+
+    static isBoolean(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (typeof fields[key] !== 'boolean') {
+                throw new error(`El campo ${key} debe ser de tipo booleano`)
+            }
+        })
+        return this
+    }
+
+    static isDate(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+            if (!dateRegex.test(fields[key])) {
+                throw new error(`El campo ${key} debe ser una fecha válida en formato YYYY-MM-DD`)
+            }
+
+            const date = new Date(fields[key])
+            if (isNaN(date.getTime())) {
+                throw new error(`El campo ${key} no corresponde a una fecha válida`)
+            }
+        })
+        return this
+    }
+
+    static isTime(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/
+            if (!timeRegex.test(fields[key])) {
+                throw new error(`El campo ${key} debe ser una hora válida en formato HH:MM o HH:MM:SS`)
+            }
+        })
+        return this
+    }
+
+    static isDateTime(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const dateTimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}(:?\d{2})?)?$/
+            if (!dateTimeRegex.test(fields[key])) {
+                throw new error(`El campo ${key} debe ser una fecha y hora válida (ej: YYYY-MM-DDTHH:mm o YYYY-MM-DDTHH:mm:ssZ)`)
+            }
+
+            const dateTime = new Date(fields[key])
+            if (isNaN(dateTime.getTime())) {
+                throw new error(`El campo ${key} no corresponde a una fecha y hora válida`)
+            }
+        })
+        return this
+    }
+
+    static isStrongPassword(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[a-zA-Z\d@$!%*?&]{8,}$/
+            if (!passwordRegex.test(fields[key])) {
+                throw new error(`El campo ${key} debe ser una contraseña segura: mínimo 8 caracteres, incluyendo al menos una mayúscula, una minúscula, un número y un símbolo`)
+            }
+        })
+        return this
+    }
+
+    static isIn(fields, validValues, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (!validValues.includes(fields[key])) {
+                throw new error(`El campo ${key} debe ser uno de los siguientes valores: ${validValues.join(', ')}`)
+            }
+        })
+        return this
+    }
+
+    static isUUID(fields, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+            if (!uuidRegex.test(fields[key])) {
+                throw new error(`El campo ${key} debe ser un UUID válido`)
+            }
+        })
+        return this
+    }
+
+    static isGreaterThan(fields, value, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (fields[key] <= value) {
+                throw new error(`El campo ${key} debe ser mayor a ${value}`)
+            }
+        })
+        return this
+    }
+
+    static isLessThan(fields, value, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (fields[key] >= value) {
+                throw new error(`El campo ${key} debe ser menor a ${value}`)
+            }
+        })
+        return this
+    }
+
+    static isGreaterThanOrEqual(fields, value, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (fields[key] < value) {
+                throw new error(`El campo ${key} debe ser mayor o igual a ${value}`)
+            }
+        })
+        return this
+    }
+
+    static isLessThanOrEqual(fields, value, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            if (fields[key] > value) {
+                throw new error(`El campo ${key} debe ser menor o igual a ${value}`)
+            }
+        })
+        return this
+    }
+
+    static isDateGreaterThan(fields, value, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const date = new Date(fields[key])
+            const valueDate = new Date(value)
+            if (date <= valueDate) {
+                throw new error(`El campo ${key} debe ser mayor a ${value}`)
+            }
+        })
+        return this
+    }
+
+    static isDateLessThan(fields, value, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const date = new Date(fields[key])
+            const valueDate = new Date(value)
+            if (date >= valueDate) {
+                throw new error(`El campo ${key} debe ser menor a ${value}`)
+            }
+        })
+        return this
+    }
+
+    static isDateGreaterThanOrEqual(fields, value, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const date = new Date(fields[key])
+            const valueDate = new Date(value)
+            if (date < valueDate) {
+                throw new error(`El campo ${key} debe ser mayor o igual a ${value}`)
+            }
+        })
+        return this
+    }
+
+    static isDateLessThanOrEqual(fields, value, error = InvalidFormatError) {
+        if (!(fields instanceof Object)) throw new InvalidFormatError('No hay campos válidos')
+        Object.keys(fields).forEach((key) => {
+            const date = new Date(fields[key])
+            const valueDate = new Date(value)
+            if (date > valueDate) {
+                throw new error(`El campo ${key} debe ser menor o igual a ${value}`)
+            }
+        })
+        return this
+    }
+
+}
+
+export default Validator
