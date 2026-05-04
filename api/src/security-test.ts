@@ -1,80 +1,123 @@
-import { Client } from 'pg'
+import express from 'express'
 import { exec } from 'child_process'
 import crypto from 'crypto'
+import fs from 'fs'
 
 /**
- * ARCHIVO DE PRUEBA PARA SEMGREP (Node.js + pg)
+ * MINI API INSEGURA (SIN DEPENDENCIA REAL DE SEQUELIZE)
  * 
- * Vulnerabilidades incluidas:
- * 1. SQL Injection
+ * Vulnerabilidades:
+ * 1. SQL Injection (simulando ORM)
  * 2. Command Injection
  * 3. Hardcoded Secrets
  * 4. Insecure Cryptography
  * 5. Dangerous Functions (eval)
  */
 
+const app = express()
+app.use(express.json())
+
 // ----------------------------------------
-// 1. SQL Injection (pg)
+// 🔐 Hardcoded Secrets
 // ----------------------------------------
-export async function getUserById(userId: string) {
-    const client = new Client({
-        user: "admin",
-        host: "localhost",
-        database: "testdb",
-        password: "password123", // 🚨 Hardcoded secret también
-        port: 5432,
-    })
+const DB_PASSWORD = "dev_password_123"
+const JWT_SECRET = "jwt_secret_test"
+const API_KEY = "fake_api_key_123456"
 
-    await client.connect()
-
-    // 🚨 SQL Injection: interpolación directa
-    const query = `SELECT * FROM users WHERE id = '${userId}'`
-    const result = await client.query(query)
-
-    await client.end()
-    return result.rows
+// ----------------------------------------
+// 🧠 Fake ORM (simulación Sequelize)
+// ----------------------------------------
+const sequelize = {
+    query: async (sql: string) => {
+        console.log("Executing SQL:", sql)
+        return [{ id: 1, username: "admin" }]
+    }
 }
+
+// ----------------------------------------
+// 1. SQL Injection
+// ----------------------------------------
+app.get('/user', async (req, res) => {
+    const id = req.query.id as string
+
+    try {
+        // 🚨 SQL Injection clara (string interpolation)
+        const result = await sequelize.query(
+            "SELECT * FROM users WHERE id = '" + id + "'"
+        )
+
+        res.json(result)
+    } catch (err) {
+        res.status(500).send(err)
+    }
+})
 
 // ----------------------------------------
 // 2. Command Injection
 // ----------------------------------------
-export function runCommand(userInput: string) {
-    exec("ls " + userInput, (err, stdout) => { // 🚨 VULN
-        if (err) {
-            console.error(err)
-            return
-        }
-        console.log(stdout)
+app.get('/exec', (req, res) => {
+    const cmd = req.query.cmd as string
+
+    // 🚨 Command Injection
+    exec("ls " + cmd, (err, stdout) => {
+        if (err) return res.status(500).send(err.message)
+        res.send(stdout)
     })
-}
+})
 
 // ----------------------------------------
-// 3. Hardcoded Secrets
+// 3. Insecure Cryptography
 // ----------------------------------------
-const STRIPE_SECRET = "fake_stripe_key_123456789" // 🚨 VULN
-const AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE" // 🚨 VULN
-const JWT_SECRET = "super_secret_jwt_key" // 🚨 VULN
+app.post('/hash', (req, res) => {
+    const { password } = req.body
 
-// ----------------------------------------
-// 4. Insecure Cryptography
-// ----------------------------------------
-export function hashPassword(password: string) {
     // 🚨 MD5 inseguro
-    return crypto.createHash('md5').update(password).digest('hex')
-}
+    const hash = crypto.createHash("md5").update(password).digest('hex')
 
-export function hashPasswordSHA1(password: string) {
-    // 🚨 SHA1 inseguro
-    return crypto.createHash('sha1').update(password).digest('hex')
-}
+    res.json({ hash })
+})
 
 // ----------------------------------------
-// 5. Dangerous Functions
+// 4. Dangerous eval
 // ----------------------------------------
-export function runEval(code: string) {
-    return eval(code) // 🚨 VULN
-}
+app.post('/eval', (req, res) => {
+    const { code } = req.body
 
-export function runDynamicFunction(code: string) {
-    return new Function(code)() // 🚨 VULN
-}
+    // 🚨 ejecución arbitraria
+    const result = eval(code)
+
+    res.json({ result })
+})
+
+// ----------------------------------------
+// 5. Path Traversal
+// ----------------------------------------
+app.get('/file', (req, res) => {
+    const file = req.query.file as string
+
+    try {
+        // 🚨 Path traversal
+        const data = fs.readFileSync('./uploads/' + file, 'utf-8')
+        res.send(data)
+    } catch (err) {
+        res.status(500).send(err)
+    }
+})
+
+// ----------------------------------------
+// 6. Información sensible expuesta
+// ----------------------------------------
+app.get('/debug', (req, res) => {
+    res.json({
+        dbPassword: DB_PASSWORD,
+        jwt: JWT_SECRET,
+        apiKey: API_KEY,
+    })
+})
+
+// ----------------------------------------
+// Init
+// ----------------------------------------
+app.listen(3000, () => {
+    console.log('🚨 Vulnerable API running on port 3000')
+})
