@@ -1,28 +1,54 @@
 rules:
+  - id: no-weak-crypto
+    name: Uso de criptografía débil
+    message: "Uso de algoritmo inseguro (MD5/SHA1). Usa bcrypt, scrypt o argon2."
+    severity: WARNING
+    languages: [javascript, typescript]
+    pattern-either:
+      - pattern: crypto.createHash("md5")
+      - pattern: crypto.createHash("sha1")
+    metadata:
+      category: security
+      cwe: "CWE-327"
+      owasp: "A02:2021 - Cryptographic Failures"
+
   - id: no-eval-usage
-    name: Detectar uso de eval()
-    message: "Evita usar eval(), puede introducir vulnerabilidades (RCE)."
+    name: Detectar uso de eval y ejecución dinámica
+    message: "Evita usar eval() o ejecución dinámica. Riesgo de RCE."
     severity: ERROR
-    languages:
-      - javascript
-      - typescript
-    pattern: eval($X)
+    languages: [javascript, typescript]
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
     metadata:
       category: security
       cwe: "CWE-95"
-  
-  - id: no-use-of-md5
-    message: "Uso de MD5 inseguro"
-    severity: WARNING
-    languages: [typescript, javascript]
-    pattern: crypto.createHash("md5")
-        
+      owasp: "A03:2021 - Injection"
+
   - id: possible-sql-injection-custom
-    message: Posible SQL Injection usando concatenación en query
+    name: Posible SQL Injection
+    message: "Construcción de query con input dinámico. Usa parámetros preparados."
     severity: ERROR
-    languages: [typescript, javascript]
-    patterns:
-      - pattern: .raw($QUERY)
-      - metavariable-regex:
-          metavariable: $QUERY
-          regex: ".*\\$\\{.*\\}.*"
+    languages: [javascript, typescript]
+    pattern-either:
+      # concatenación clásica
+      - pattern: $DB.query("..." + $INPUT + "...")
+      # template string
+      - pattern: $DB.query(`...${$INPUT}...`)
+      # raw query tipo ORM
+      - pattern: $DB.raw($QUERY)
+    metadata:
+      category: security
+      cwe: "CWE-89"
+      owasp: "A03:2021 - Injection"
+
+  - id: hardcoded-secret-generic
+    name: Posible secreto hardcodeado
+    message: "Evita credenciales hardcodeadas en el código."
+    severity: WARNING
+    languages: [javascript, typescript]
+    pattern-regex: '(password|secret|api[_-]?key|token)\\s*=\\s*["\'][^"\']{8,}["\']'
+    metadata:
+      category: security
+      cwe: "CWE-798"
+      owasp: "A02:2021 - Cryptographic Failures"
