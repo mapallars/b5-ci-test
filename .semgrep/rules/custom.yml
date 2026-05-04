@@ -11,7 +11,7 @@ rules:
       category: security
       cwe: "CWE-327"
       owasp: "A02:2021 - Cryptographic Failures"
-
+      
   - id: no-eval-usage
     name: Detectar uso de eval y ejecución dinámica
     message: "Evita usar eval() o ejecución dinámica. Riesgo de RCE."
@@ -41,14 +41,3 @@ rules:
       category: security
       cwe: "CWE-89"
       owasp: "A03:2021 - Injection"
-
-  - id: hardcoded-secret-generic
-    name: Posible secreto hardcodeado
-    message: "Evita credenciales hardcodeadas en el código."
-    severity: WARNING
-    languages: [javascript, typescript]
-    pattern-regex: '(password|secret|api[_-]?key|token)\\s*=\\s*["\'][^"\']{8,}["\']'
-    metadata:
-      category: security
-      cwe: "CWE-798"
-      owasp: "A02:2021 - Cryptographic Failures"
