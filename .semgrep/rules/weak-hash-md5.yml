@@ -1,6 +1,0 @@
-rules:
-  - id: weak-hash-md5
-    message: Uso de MD5 inseguro
-    severity: WARNING
-    languages: [javascript, typescript]
-    pattern: crypto.createHash("md5")

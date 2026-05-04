@@ -16,7 +16,6 @@ app.get('/user', async (req, res) => {
     const id = req.query.id as string
 
     try {
-        // 🚨 SQL Injection clara (string interpolation)
         const result = await sequelize.query(
             "SELECT * FROM users WHERE id = '" + id + "'"
         )
@@ -50,10 +49,6 @@ app.post('/eval', (req, res) => {
     const result = eval(code)
 
     res.json({ result })
-})
-
-app.get('/xss2', (req, res) => {
-    res.send(req.query.q)
 })
 
 app.listen(3000, () => {

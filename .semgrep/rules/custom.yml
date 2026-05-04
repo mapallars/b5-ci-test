@@ -1,0 +1,28 @@
+rules:
+  - id: no-eval-usage
+    name: Detectar uso de eval()
+    message: "Evita usar eval(), puede introducir vulnerabilidades (RCE)."
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    pattern: eval($X)
+    metadata:
+      category: security
+      cwe: "CWE-95"
+  
+  - id: no-use-of-md5
+    message: "Uso de MD5 inseguro"
+    severity: WARNING
+    languages: [typescript, javascript]
+    pattern: crypto.createHash("md5")
+        
+  - id: possible-sql-injection-custom
+    message: Posible SQL Injection usando concatenación en query
+    severity: ERROR
+    languages: [typescript, javascript]
+    patterns:
+      - pattern: .raw($QUERY)
+      - metavariable-regex:
+          metavariable: $QUERY
+          regex: ".*\\$\\{.*\\}.*"
