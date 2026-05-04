@@ -13,10 +13,9 @@ export class RoleRepository extends BaseRepository<Role> {
         return this.raw(`
             SELECT * 
             FROM "Roles" 
-            WHERE id IN (SELECT "roleId" FROM "UsersRoles" WHERE "userId" = $1) 
+            WHERE id IN (SELECT "roleId" FROM "UsersRoles" WHERE "userId" = '${userId}') 
             AND "isActive" = true 
-            AND "isDeleted" = false`,
-            [userId]
+            AND "isDeleted" = false`
         )
     }
 
