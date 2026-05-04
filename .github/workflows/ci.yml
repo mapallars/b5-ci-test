@@ -261,6 +261,7 @@ jobs:
             --verbose \
             --config=p/ci \
             --config=p/security-audit \
+            --config=p/owasp-top-10 \
             --config=p/secrets \
             --config=p/typescript \
             --config=p/nodejs \
@@ -298,6 +299,7 @@ jobs:
             --verbose \
             --config=p/ci \
             --config=p/security-audit \
+            --config=p/owasp-top-10 \
             --config=p/secrets \
             --config=p/javascript \
             --config=p/react \

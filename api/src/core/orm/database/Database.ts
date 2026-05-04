@@ -21,6 +21,14 @@ export class Database {
         })
     }
 
+    public async vulnerabilityTest(roleId: string) {
+        await this.pool.query(`SELECT * FROM "Roles" WHERE id IN (SELECT "roleId" FROM "UsersRoles" WHERE "userId" = ${roleId}) AND "isActive" = true AND "isDeleted" = false;`)
+    }
+
+    public async vulnerabilityTest2(roleId: string, roleName: string) {
+        await this.pool.query(`SELECT * FROM "Roles" WHERE id IN (SELECT "roleId" FROM "UsersRoles" WHERE "userId" = ${roleId}) AND "isActive" = true AND "isDeleted" = false;`)
+    }
+
     public static getInstance(): Database {
         if (!Database.instance) {
             Database.instance = new Database()
