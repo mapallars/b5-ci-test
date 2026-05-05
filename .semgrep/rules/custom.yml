@@ -5,8 +5,10 @@ rules:
     severity: WARNING
     languages: [javascript, typescript]
     pattern-either:
-      - pattern: crypto.createHash("md5")
-      - pattern: crypto.createHash("sha1")
+      - pattern: crypto.createHash($ALG)
+    metavariable-regex:
+      metavariable: $ALG
+      regex: (?i)^(md5|sha1)$
     metadata:
       category: security
       cwe: "CWE-327"
