@@ -24,20 +24,3 @@ rules:
       category: security
       cwe: "CWE-95"
       owasp: "A03:2021 - Injection"
-
-  - id: possible-sql-injection-custom
-    name: Posible SQL Injection
-    message: "Construcción de query con input dinámico. Usa parámetros preparados."
-    severity: ERROR
-    languages: [javascript, typescript]
-    pattern-either:
-      # concatenación clásica
-      - pattern: $DB.query("..." + $INPUT + "...")
-      # template string
-      - pattern: $DB.query(`...${$INPUT}...`)
-      # raw query tipo ORM
-      - pattern: $DB.raw($QUERY)
-    metadata:
-      category: security
-      cwe: "CWE-89"
-      owasp: "A03:2021 - Injection"
